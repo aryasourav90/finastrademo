@@ -1,0 +1,55 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool: 
+  vmImage: 'ubuntu-latest'
+
+variables:
+  IMAGE_NAME: 'webapp'
+  ACR_NAME: demoacrfin.azurecr.io
+
+stages:
+- stage: Dev
+  jobs:
+  - job: Build
+    steps:
+    - script: |
+        docker build -t ${{ variables.IMAGE_NAME }} .
+        docker tag ${{ variables.IMAGE_NAME }} ${{ variables.ACR_NAME }}.azurecr.io/${{ variables.IMAGE_NAME }}:latest
+        docker push ${{ variables.ACR_NAME }}.azurecr.io/${{ variables.IMAGE_NAME }}:latest
+      displayName: 'Build and push image'
+    - task: Kubernetes@1
+      inputs:
+        connectionType: 'Azure Resource Manager'
+        azureSubscriptionEndpoint: 'My Azure Subscription'
+        azureResourceGroup: 'My Resource Group'
+        kubernetesServiceEndpoint: 'My Kubernetes Service Connection Dev'
+        namespace: 'default'
+        command: 'apply'
+        arguments: '-f kubernetes-dev.yml'
+      displayName: 'Deploy to Dev'
+- stage: Prod
+  jobs:
+  - job: Build
+    steps:
+    - script: |
+        docker build -t ${{ variables.IMAGE_NAME }} .
+        docker tag ${{ variables.IMAGE_NAME }} ${{ variables.ACR_NAME }}.azurecr.io/${{ variables.IMAGE_NAME }}:latest
+        docker push ${{ variables.ACR_NAME }}.azurecr.io/${{ variables.IMAGE_NAME }}:latest
+      displayName: 'Build and push image'
+    - task: Kubernetes@1
+      inputs:
+        connectionType: 'Azure Resource Manager'
+        azureSubscriptionEndpoint: 'My Azure Subscription'
+        azureResourceGroup: 'My Resource Group'
+        kubernetesServiceEndpoint: 'My Kubernetes Service Connection Prod'
+        namespace: 'default'
+        command: 'apply'
+        arguments: '-f kubernetes-prod.yml'
+      condition: succeeded()
+      displayName: 'Deploy to Prod'
